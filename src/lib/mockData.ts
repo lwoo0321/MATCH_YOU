@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+// Mock data and types for the study analytics platform
 
 // We'll use a simple approach with React state + localStorage for now
 // This file provides types and mock data
