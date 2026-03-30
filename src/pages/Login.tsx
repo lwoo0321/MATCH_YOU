@@ -1,20 +1,29 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookOpen } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('studyapp_user', JSON.stringify({ email, loggedIn: true }));
-    navigate('/');
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) {
+      toast.error('로그인에 실패했어요. 이메일과 비밀번호를 확인해 주세요.');
+    } else {
+      navigate('/');
+    }
   };
 
   return (
@@ -37,7 +46,9 @@ const Login = () => {
               <Label htmlFor="password">비밀번호</Label>
               <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
-            <Button type="submit" className="w-full font-semibold">로그인</Button>
+            <Button type="submit" className="w-full font-semibold" disabled={loading}>
+              {loading ? '로그인 중...' : '로그인'}
+            </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             아직 계정이 없으신가요?{' '}

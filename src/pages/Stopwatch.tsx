@@ -3,10 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSubjects } from '@/contexts/SubjectContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Play, Pause, Square, Bluetooth, BluetoothOff } from 'lucide-react';
 
 const Stopwatch = () => {
   const { subjects } = useSubjects();
+  const { user } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [subject, setSubject] = useState(subjects[0]?.name || '');
@@ -14,29 +17,61 @@ const Stopwatch = () => {
   const [sessions, setSessions] = useState<{ subject: string; minutes: number; time: string; color: string }[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
+  const sessionStartRef = useRef<Date | null>(null);
 
   useEffect(() => {
     if (!subject && subjects.length > 0) setSubject(subjects[0].name);
   }, [subjects, subject]);
 
+  // Load today's sessions
+  useEffect(() => {
+    if (!user) return;
+    const today = new Date().toISOString().split('T')[0];
+    supabase.from('study_sessions').select('*').eq('user_id', user.id).eq('date', today).order('created_at', { ascending: false }).then(({ data }) => {
+      if (data) {
+        setSessions(data.map((s) => ({
+          subject: s.subject_name,
+          minutes: s.elapsed_minutes,
+          time: new Date(s.start_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+          color: subjects.find((sub) => sub.name === s.subject_name)?.color || '220 15% 60%',
+        })));
+      }
+    });
+  }, [user, subjects]);
+
   const start = useCallback(() => {
     startTimeRef.current = Date.now() - elapsed * 1000;
+    sessionStartRef.current = new Date();
     setIsRunning(true);
   }, [elapsed]);
 
   const pause = useCallback(() => { setIsRunning(false); }, []);
 
-  const stop = useCallback(() => {
-    if (elapsed > 0) {
+  const stop = useCallback(async () => {
+    if (elapsed > 0 && user) {
       const sub = subjects.find((s) => s.name === subject);
+      const minutes = Math.round(elapsed / 60);
+      const startTime = sessionStartRef.current || new Date();
+
+      await supabase.from('study_sessions').insert({
+        user_id: user.id,
+        subject_id: sub?.id || null,
+        subject_name: subject,
+        start_time: startTime.toISOString(),
+        end_time: new Date().toISOString(),
+        elapsed_minutes: minutes,
+        date: new Date().toISOString().split('T')[0],
+      });
+
       setSessions((prev) => [
-        { subject, minutes: Math.round(elapsed / 60), time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }), color: sub?.color || '220 15% 60%' },
+        { subject, minutes, time: startTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }), color: sub?.color || '220 15% 60%' },
         ...prev,
       ]);
     }
     setIsRunning(false);
     setElapsed(0);
-  }, [elapsed, subject, subjects]);
+    sessionStartRef.current = null;
+  }, [elapsed, subject, subjects, user]);
 
   useEffect(() => {
     if (isRunning) {
@@ -63,7 +98,7 @@ const Stopwatch = () => {
         const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
         if (device) setBleConnected(true);
       } else {
-        alert('이 기기/브라우저에서는 블루투스를 사용할 수 없어요. 네이티브 앱에서 사용해 주세요.');
+        alert('이 기기/브라우저에서는 블루투스를 사용할 수 없어요.');
       }
     } catch { /* cancelled */ }
   };
@@ -83,15 +118,12 @@ const Stopwatch = () => {
       <div className="px-4 pt-6 space-y-6">
         <div className="flex justify-center">
           <Select value={subject} onValueChange={setSubject} disabled={isRunning}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="과목 선택" />
-            </SelectTrigger>
+            <SelectTrigger className="w-48"><SelectValue placeholder="과목 선택" /></SelectTrigger>
             <SelectContent>
               {subjects.map((s) => (
                 <SelectItem key={s.id} value={s.name}>
                   <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: `hsl(${s.color})` }} />
-                    {s.name}
+                    <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: `hsl(${s.color})` }} />{s.name}
                   </div>
                 </SelectItem>
               ))}
@@ -107,24 +139,16 @@ const Stopwatch = () => {
 
         <div className="flex items-center justify-center gap-4">
           {!isRunning ? (
-            <Button size="lg" className="h-14 w-14 rounded-full p-0" onClick={start}>
-              <Play className="h-6 w-6 ml-0.5" />
-            </Button>
+            <Button size="lg" className="h-14 w-14 rounded-full p-0" onClick={start}><Play className="h-6 w-6 ml-0.5" /></Button>
           ) : (
-            <Button size="lg" variant="secondary" className="h-14 w-14 rounded-full p-0" onClick={pause}>
-              <Pause className="h-6 w-6" />
-            </Button>
+            <Button size="lg" variant="secondary" className="h-14 w-14 rounded-full p-0" onClick={pause}><Pause className="h-6 w-6" /></Button>
           )}
-          <Button size="lg" variant="outline" className="h-14 w-14 rounded-full p-0" onClick={stop} disabled={elapsed === 0}>
-            <Square className="h-5 w-5" />
-          </Button>
+          <Button size="lg" variant="outline" className="h-14 w-14 rounded-full p-0" onClick={stop} disabled={elapsed === 0}><Square className="h-5 w-5" /></Button>
         </div>
 
         {sessions.length > 0 && (
           <Card className="border-none shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">오늘의 기록</CardTitle>
-            </CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">오늘의 기록</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {sessions.map((s, i) => (
                 <div key={i} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: `hsl(${s.color} / 0.1)` }}>
