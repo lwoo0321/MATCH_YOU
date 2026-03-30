@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookOpen } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -13,10 +15,37 @@ const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('student');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('studyapp_user', JSON.stringify({ name, email, role, loggedIn: true }));
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { display_name: name },
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Assign role
+    if (data.user) {
+      await supabase.from('user_roles').insert({
+        user_id: data.user.id,
+        role: role as 'student' | 'ta' | 'parent',
+      });
+    }
+
+    setLoading(false);
+    toast.success('가입이 완료되었어요! 🎉');
     navigate('/');
   };
 
@@ -42,7 +71,7 @@ const Signup = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">비밀번호</Label>
-              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
             </div>
             <div className="space-y-2">
               <Label>역할</Label>
@@ -55,7 +84,9 @@ const Signup = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" className="w-full font-semibold">가입하기</Button>
+            <Button type="submit" className="w-full font-semibold" disabled={loading}>
+              {loading ? '가입 중...' : '가입하기'}
+            </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             이미 계정이 있으신가요?{' '}

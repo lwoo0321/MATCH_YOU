@@ -1,30 +1,30 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { mockUser } from '@/lib/mockData';
 import { LogOut, User, Settings, BookMarked, Palette } from 'lucide-react';
 
 const Profile = () => {
   const navigate = useNavigate();
+  const { user, profile, signOut } = useAuth();
 
-  const handleLogout = () => {
-    localStorage.removeItem('studyapp_user');
+  const handleLogout = async () => {
+    await signOut();
     navigate('/login');
   };
 
-  const roleLabel = { student: '학생', ta: '선생님 / 컨설턴트', parent: '학부모' }[mockUser.role] || mockUser.role;
+  const displayName = profile?.display_name || user?.email || '사용자';
 
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="safe-top bg-card px-5 pb-6 pt-4 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
-            {mockUser.name.charAt(0)}
+            {displayName.charAt(0)}
           </div>
           <div>
-            <h1 className="text-xl font-bold">{mockUser.name}</h1>
-            <p className="text-sm text-muted-foreground">{roleLabel}</p>
-            <p className="text-xs text-muted-foreground">{mockUser.email}</p>
+            <h1 className="text-xl font-bold">{displayName}</h1>
+            <p className="text-xs text-muted-foreground">{user?.email}</p>
           </div>
         </div>
       </div>

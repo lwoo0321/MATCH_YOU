@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { mockWeeklyData, mockUser } from '@/lib/mockData';
 import { useSubjects } from '@/contexts/SubjectContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Clock, Target, Flame, TrendingUp } from 'lucide-react';
 
@@ -19,6 +19,7 @@ const StatCard = ({ icon: Icon, label, value, sub, color }: { icon: any; label: 
   </Card>
 );
 
+// Mock weekly data for now (will be replaced with real queries later)
 const weeklyDataKo = [
   { day: '월', planned: 180, actual: 150 },
   { day: '화', planned: 200, actual: 190 },
@@ -31,10 +32,12 @@ const weeklyDataKo = [
 
 const Dashboard = () => {
   const { subjects } = useSubjects();
+  const { profile } = useAuth();
   const totalActual = weeklyDataKo.reduce((s, d) => s + d.actual, 0);
   const totalPlanned = weeklyDataKo.reduce((s, d) => s + d.planned, 0);
   const achievementRate = Math.round((totalActual / totalPlanned) * 100);
   const streak = 5;
+  const displayName = profile?.display_name || '학생';
 
   const subjectDist = subjects.slice(0, 5).map((s, i) => ({
     name: s.name,
@@ -45,12 +48,12 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background pb-24">
       <div className="safe-top bg-primary px-5 pb-6 pt-4">
         <p className="text-sm font-medium text-primary-foreground/70">안녕하세요,</p>
-        <h1 className="text-xl font-bold text-primary-foreground">{mockUser.name}님 👋</h1>
+        <h1 className="text-xl font-bold text-primary-foreground">{displayName}님 👋</h1>
       </div>
 
       <div className="space-y-5 px-4 -mt-3">
         <div className="grid grid-cols-2 gap-3">
-          <StatCard icon={Clock} label="오늘" value={`${Math.round(weeklyDataKo[0].actual / 60)}시간 ${weeklyDataKo[0].actual % 60}분`} sub="공부 시간" color="bg-primary/10 text-primary" />
+          <StatCard icon={Clock} label="오늘" value="2시간 30분" sub="공부 시간" color="bg-primary/10 text-primary" />
           <StatCard icon={Target} label="목표" value={`${achievementRate}%`} sub="이번 주 달성률" color="bg-success/10 text-success" />
           <StatCard icon={Flame} label="연속" value={`${streak}일`} sub="잘 하고 있어요!" color="bg-accent/10 text-accent-foreground" />
           <StatCard icon={TrendingUp} label="주간" value={`${Math.round(totalActual / 60)}시간`} sub={`계획: ${Math.round(totalPlanned / 60)}시간`} color="bg-chart-4/10 text-chart-4" />
